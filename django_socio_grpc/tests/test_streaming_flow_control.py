@@ -14,6 +14,7 @@ from django_socio_grpc.streaming import (
     StreamingMetrics,
     StreamingConfig,
     check_context_cancelled,
+    check_context_cancelled_async,
     stream_queryset_sync,
     stream_queryset_async,
     stream_paginated_queryset_async,
@@ -163,8 +164,8 @@ class SyncStreamingTests(TestCase):
         queryset = MockQuerySet(['item1', 'item2', 'item3', 'item4', 'item5'])
         mock_context = Mock()
         
-        # Cancel after 2 items
-        mock_context.cancelled.side_effect = [False, False, True]
+        # Cancel on the second check: first check returns False, second returns True
+        mock_context.cancelled.side_effect = [False, True, True, True, True]
         
         messages = list(stream_queryset_sync(
             queryset=queryset,
@@ -174,8 +175,12 @@ class SyncStreamingTests(TestCase):
             enable_metrics=False
         ))
         
-        # Should stop early due to cancellation
-        self.assertLess(len(messages), 5)
+        # Should stop early due to cancellation - exactly 2 items should be processed
+        # Item 1: no check, yield
+        # Item 2: check (False), reset, yield  
+        # Item 3: no check, yield
+        # Item 4: check (True), break - so only 3 items yielded
+        self.assertEqual(len(messages), 3)
     
     def test_stream_queryset_sync_with_metrics(self):
         """Test streaming with metrics collection."""
@@ -221,8 +226,8 @@ class AsyncStreamingTests(TestCase):
         queryset = MockQuerySet(['item1', 'item2', 'item3', 'item4', 'item5'])
         mock_context = AsyncMock()
         
-        # Cancel after 2 items
-        mock_context.cancelled.side_effect = [False, False, True]
+        # Cancel on the second check: first check returns False, second returns True
+        mock_context.cancelled.side_effect = [False, True, True, True, True]
         
         messages = []
         async for message in stream_queryset_async(
@@ -234,8 +239,8 @@ class AsyncStreamingTests(TestCase):
         ):
             messages.append(message)
         
-        # Should stop early due to cancellation
-        self.assertLess(len(messages), 5)
+        # Should stop early due to cancellation - exactly 3 items should be processed
+        self.assertEqual(len(messages), 3)
     
     def test_stream_queryset_async_with_cancellation(self):
         """Wrapper for async cancellation test."""
@@ -308,11 +313,10 @@ class FlowControlTests(TestCase):
         mock_context = Mock()
         
         cancellation_checks = []
-        original_cancelled = mock_context.cancelled
         
         def mock_cancelled():
             cancellation_checks.append(len(cancellation_checks))
-            return original_cancelled() if hasattr(original_cancelled, '__call__') else False
+            return False  # Always return False to never cancel
         
         mock_context.cancelled = mock_cancelled
         

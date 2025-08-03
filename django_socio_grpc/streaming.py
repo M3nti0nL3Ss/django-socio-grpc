@@ -99,6 +99,28 @@ def check_context_cancelled(context: Union[ServicerContext, AsyncServicerContext
         return False
 
 
+async def check_context_cancelled_async(context: AsyncServicerContext) -> bool:
+    """
+    Check if the async gRPC context has been cancelled by the client.
+    
+    Args:
+        context: The async gRPC servicer context
+        
+    Returns:
+        True if the context is cancelled, False otherwise
+    """
+    try:
+        result = context.cancelled()
+        # Handle both sync and async cancelled() methods
+        if hasattr(result, '__await__'):
+            return await result
+        else:
+            return result
+    except Exception as e:
+        logger.warning(f"Error checking async context cancellation: {e}")
+        return False
+
+
 def stream_queryset_sync(
     queryset: QuerySet,
     serializer_class,
@@ -138,6 +160,9 @@ def stream_queryset_sync(
     try:
         # Use iterator() with chunk_size for memory efficiency
         for item in queryset.iterator(chunk_size=chunk_size):
+            # Increment counter before checking for cancellation
+            items_since_last_check += 1
+            
             # Check for cancellation periodically
             if context and items_since_last_check >= cancellation_check_interval:
                 if check_context_cancelled(context):
@@ -153,7 +178,6 @@ def stream_queryset_sync(
                 metrics.record_item_streamed()
             
             yield message
-            items_since_last_check += 1
             
     except Exception as e:
         logger.error(f"Error during synchronous streaming: {e}")
@@ -232,9 +256,12 @@ async def stream_queryset_async(
                 await asyncio.sleep(0)
 
         async for item in async_iterator():
+            # Increment counter before checking for cancellation
+            items_since_last_check += 1
+            
             # Check for cancellation periodically
             if context and items_since_last_check >= cancellation_check_interval:
-                if check_context_cancelled(context):
+                if await check_context_cancelled_async(context):
                     logger.info("Stream cancelled by client")
                     break
                 items_since_last_check = 0
@@ -252,7 +279,6 @@ async def stream_queryset_async(
             # Yield with timeout to detect client disconnection
             try:
                 yield message
-                items_since_last_check += 1
                 
                 # Allow other coroutines to run and respect backpressure
                 await asyncio.sleep(0)
@@ -310,9 +336,12 @@ async def stream_paginated_queryset_async(
     try:
         # Stream items from the page
         for item in page:
+            # Increment counter before checking for cancellation
+            items_since_last_check += 1
+            
             # Check for cancellation periodically
             if context and items_since_last_check >= cancellation_check_interval:
-                if check_context_cancelled(context):
+                if await check_context_cancelled_async(context):
                     logger.info("Stream cancelled by client")
                     break
                 items_since_last_check = 0
@@ -328,7 +357,6 @@ async def stream_paginated_queryset_async(
                 metrics.record_item_streamed()
             
             yield message
-            items_since_last_check += 1
             
             # Allow other coroutines to run
             await asyncio.sleep(0)
