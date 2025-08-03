@@ -147,18 +147,18 @@ class StreamModelMixin(GRPCActionMixin):
             for memory efficiency and supports flow control with cancellation checks.
         """
         from django_socio_grpc.streaming import stream_queryset_sync
-        
+
         queryset = self.filter_queryset(self.get_queryset())
-        
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             # For paginated results, stream the page items directly
             serializer_class = self.get_serializer_class()
             for item in page:
                 # Check for cancellation periodically
-                if context and hasattr(context, 'cancelled') and context.cancelled():
+                if context and hasattr(context, "cancelled") and context.cancelled():
                     break
-                
+
                 serializer = self.get_serializer(item, stream=True)
                 yield serializer.message
         else:
@@ -167,8 +167,8 @@ class StreamModelMixin(GRPCActionMixin):
             yield from stream_queryset_sync(
                 queryset=queryset,
                 serializer_class=serializer_class,
-                serializer_kwargs={'stream': True},
-                context=context
+                serializer_kwargs={"stream": True},
+                context=context,
             )
 
     @staticmethod
@@ -409,24 +409,27 @@ class AsyncStreamModelMixin(StreamModelMixin):
     async def _get_list_data(self):
         """
         Get queryset data for streaming with memory-efficient async iteration.
-        
-        Returns an async generator that yields individual items instead of 
+
+        Returns an async generator that yields individual items instead of
         loading everything into memory.
         """
-        from django_socio_grpc.streaming import stream_queryset_async, stream_paginated_queryset_async
-        
+        from django_socio_grpc.streaming import (
+            stream_paginated_queryset_async,
+            stream_queryset_async,
+        )
+
         queryset = await sync_to_async(self.get_queryset)()
         queryset = await self.afilter_queryset(queryset)
-        
+
         page = await sync_to_async(self.paginate_queryset)(queryset)
         serializer_class = await sync_to_async(self.get_serializer_class)()
-        
+
         if page is not None:
             # Stream paginated results
             async for message in stream_paginated_queryset_async(
                 page=page,
                 serializer_class=serializer_class,
-                serializer_kwargs={'stream': True}
+                serializer_kwargs={"stream": True},
             ):
                 yield message
         else:
@@ -434,14 +437,14 @@ class AsyncStreamModelMixin(StreamModelMixin):
             async for message in stream_queryset_async(
                 queryset=queryset,
                 serializer_class=serializer_class,
-                serializer_kwargs={'stream': True}
+                serializer_kwargs={"stream": True},
             ):
                 yield message
 
     async def Stream(self, request, context):
         """
         List a queryset. This sends a sequence of messages of
-        ``serializer.Meta.proto_class`` to the client using memory-efficient 
+        ``serializer.Meta.proto_class`` to the client using memory-efficient
         async streaming with flow control.
 
         .. note::
@@ -449,21 +452,24 @@ class AsyncStreamModelMixin(StreamModelMixin):
             This is a server streaming RPC that uses async iteration patterns
             with cancellation checks and backpressure monitoring.
         """
-        from django_socio_grpc.streaming import stream_queryset_async, stream_paginated_queryset_async
-        
+        from django_socio_grpc.streaming import (
+            stream_paginated_queryset_async,
+            stream_queryset_async,
+        )
+
         queryset = await sync_to_async(self.get_queryset)()
         queryset = await self.afilter_queryset(queryset)
-        
+
         page = await sync_to_async(self.paginate_queryset)(queryset)
         serializer_class = await sync_to_async(self.get_serializer_class)()
-        
+
         if page is not None:
             # Stream paginated results with context awareness
             async for message in stream_paginated_queryset_async(
                 page=page,
                 serializer_class=serializer_class,
-                serializer_kwargs={'stream': True},
-                context=context
+                serializer_kwargs={"stream": True},
+                context=context,
             ):
                 yield message
         else:
@@ -471,8 +477,8 @@ class AsyncStreamModelMixin(StreamModelMixin):
             async for message in stream_queryset_async(
                 queryset=queryset,
                 serializer_class=serializer_class,
-                serializer_kwargs={'stream': True},
-                context=context
+                serializer_kwargs={"stream": True},
+                context=context,
             ):
                 yield message
 

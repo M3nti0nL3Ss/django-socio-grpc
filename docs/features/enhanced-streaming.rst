@@ -18,7 +18,7 @@ Add streaming configuration to your Django settings:
 # settings.py
 GRPC_FRAMEWORK = {
     # ... other settings ...
-    
+
     # Streaming configuration
     'STREAMING_CHUNK_SIZE': 1000,  # Default chunk size for QuerySet iterator()
     'STREAMING_CANCELLATION_CHECK_INTERVAL': 100,  # Items before checking cancellation
@@ -39,7 +39,7 @@ class BookStreamService(mixins.AsyncStreamModelMixin, generics.GenericService):
     queryset = Book.objects.all().order_by('id')
     serializer_class = BookProtoSerializer
     pagination_class = PageNumberPagination
-    
+
     # The Stream method automatically uses enhanced streaming
 ```
 
@@ -97,11 +97,11 @@ You can also use the streaming utilities directly for custom implementations:
 from django_socio_grpc.streaming import stream_queryset_async
 
 class CustomService(generics.GenericService):
-    
+
     @grpc_action(response_stream=True)
     async def CustomStream(self, request, context):
         queryset = MyModel.objects.filter(active=True)
-        
+
         async for message in stream_queryset_async(
             queryset=queryset,
             serializer_class=MyModelSerializer,
@@ -208,12 +208,12 @@ Test your streaming services with the provided utilities:
 from django_socio_grpc.tests.test_streaming_flow_control import MockQuerySet, MockSerializer
 
 class StreamingServiceTests(TestCase):
-    
+
     async def test_stream_with_cancellation(self):
         queryset = MockQuerySet(['item1', 'item2', 'item3'])
         mock_context = Mock()
         mock_context.cancelled.side_effect = [False, True]  # Cancel after 1 item
-        
+
         messages = []
         async for message in stream_queryset_async(
             queryset=queryset,
@@ -222,7 +222,7 @@ class StreamingServiceTests(TestCase):
             cancellation_check_interval=1
         ):
             messages.append(message)
-        
+
         self.assertEqual(len(messages), 1)  # Should stop early
 ```
 

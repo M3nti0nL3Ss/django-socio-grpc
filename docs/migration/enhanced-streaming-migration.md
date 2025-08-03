@@ -7,7 +7,7 @@ This guide helps you migrate from the legacy streaming implementation to the new
 The enhanced streaming implementation improves:
 
 1. **Memory Efficiency**: Uses Django QuerySet `iterator()` instead of loading entire datasets
-2. **Flow Control**: Adds cancellation checking and timeout handling  
+2. **Flow Control**: Adds cancellation checking and timeout handling
 3. **Backpressure Monitoring**: Collects metrics to identify performance bottlenecks
 4. **Configuration**: Provides tunable parameters for different use cases
 
@@ -35,7 +35,7 @@ async def CustomStream(self, request, context):
     queryset = self.get_queryset()
     serializer = self.get_serializer(queryset, many=True, stream=True)
     messages = await serializer.amessage
-    
+
     for message in messages:  # All loaded into memory
         yield message
 ```
@@ -46,7 +46,7 @@ from django_socio_grpc.streaming import stream_queryset_async
 
 async def CustomStream(self, request, context):
     queryset = self.get_queryset()
-    
+
     async for message in stream_queryset_async(
         queryset=queryset,
         serializer_class=self.get_serializer_class(),
@@ -65,10 +65,10 @@ Add the new streaming configuration to your Django settings:
 # settings.py
 GRPC_FRAMEWORK = {
     # ... existing settings ...
-    
+
     # New streaming configuration
     'STREAMING_CHUNK_SIZE': 1000,  # Default: 1000
-    'STREAMING_CANCELLATION_CHECK_INTERVAL': 100,  # Default: 100  
+    'STREAMING_CANCELLATION_CHECK_INTERVAL': 100,  # Default: 100
     'STREAMING_YIELD_TIMEOUT': 30.0,  # Default: 30.0
     'STREAMING_ENABLE_METRICS': True,  # Default: True
 }
@@ -85,7 +85,7 @@ Choose values based on your use case:
 'STREAMING_ENABLE_METRICS': False,  # Disable for max performance
 ```
 
-#### Interactive Services  
+#### Interactive Services
 ```python
 'STREAMING_CHUNK_SIZE': 100,
 'STREAMING_CANCELLATION_CHECK_INTERVAL': 10,
@@ -109,8 +109,8 @@ The enhanced streaming significantly reduces memory usage for large datasets:
 queryset = Book.objects.all()  # 1 million records
 serializer = BookSerializer(queryset, many=True)  # All in memory
 
-# Enhanced: Memory usage = O(chunk_size) 
-queryset = Book.objects.all()  # 1 million records  
+# Enhanced: Memory usage = O(chunk_size)
+queryset = Book.objects.all()  # 1 million records
 # Only ~1000 records in memory at a time (configurable)
 ```
 
@@ -161,7 +161,7 @@ LOGGING = {
 
 - **Average latency**: Processing time per item
   - < 0.001s: Excellent
-  - 0.001-0.01s: Good  
+  - 0.001-0.01s: Good
   - > 0.01s: May indicate serialization bottlenecks
 
 ## Testing Migration
@@ -174,16 +174,16 @@ Verify your streaming services work correctly:
 from django_socio_grpc.tests.test_streaming_flow_control import MockQuerySet
 
 class StreamingMigrationTests(TestCase):
-    
+
     async def test_enhanced_streaming_compatibility(self):
         """Verify enhanced streaming produces same results as legacy."""
         service = YourStreamingService()
-        
+
         # Test with small dataset
         messages = []
         async for message in service.Stream(request, context):
             messages.append(message)
-        
+
         # Verify expected count and content
         self.assertEqual(len(messages), expected_count)
 ```
@@ -197,7 +197,7 @@ Test streaming performance with realistic data volumes:
 for i in range(100000):
     TestModel.objects.create(name=f"test_{i}")
 
-# Test streaming performance  
+# Test streaming performance
 start_time = time.time()
 count = 0
 async for message in service.Stream(request, context):
@@ -221,12 +221,12 @@ class LegacyStreamModelMixin(mixins.StreamModelMixin):
     def Stream(self, request, context):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
-        
+
         if page is not None:
             serializer = self.get_serializer(page, many=True, stream=True)
         else:
             serializer = self.get_serializer(queryset, many=True, stream=True)
-            
+
         yield from serializer.message
 ```
 
@@ -240,7 +240,7 @@ class LegacyStreamModelMixin(mixins.StreamModelMixin):
 **Problem**: Still getting OOM errors with enhanced streaming
 **Solution**: Reduce `STREAMING_CHUNK_SIZE` and check for inefficient queries
 
-### Slow Streaming Performance  
+### Slow Streaming Performance
 **Problem**: Enhanced streaming is slower than expected
 **Solution**: Increase `STREAMING_CHUNK_SIZE` and optimize database queries
 
@@ -251,5 +251,3 @@ class LegacyStreamModelMixin(mixins.StreamModelMixin):
 ### High CPU Usage from Metrics
 **Problem**: Metrics collection causing performance issues
 **Solution**: Set `STREAMING_ENABLE_METRICS: False` in production
-
-
