@@ -115,6 +115,15 @@ DEFAULTS = {
     "DEFAULT_GENERATION_PLUGINS": [GlobalScopeWrappedEnumGenerationPlugin()],
     # Enable the healthcheck service
     "ENABLE_HEALTH_CHECK": False,
+    # Streaming configuration for flow control and memory optimization
+    # Default chunk size for QuerySet iterator() calls in streaming operations
+    "STREAMING_CHUNK_SIZE": 1000,
+    # Number of items to stream before checking for client cancellation
+    "STREAMING_CANCELLATION_CHECK_INTERVAL": 100,
+    # Timeout in seconds between yields to detect client disconnection
+    "STREAMING_YIELD_TIMEOUT": 30.0,
+    # Enable metrics collection for streaming operations
+    "STREAMING_ENABLE_METRICS": True,
 }
 
 
